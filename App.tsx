@@ -1,45 +1,53 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+// App.tsx
+import React, { useEffect } from 'react';
+import { Provider } from 'react-redux';
+import { useDispatch } from 'react-redux';
+import { store } from './src/store';
+import AppNavigator from './src/navigation/AppNavigator';
+import { setupNotifications } from './src/utils/notifications';
+import { syncService } from './src/services/syncService';
+import { ThemeProvider } from './src/theme/ThemeContext';
+import { firebaseAuth } from './src/api/firebase';
+import { setAuthLoading, setAuthUser } from './src/store/slices/authSlice';
+import { AppDispatch } from './src/store';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+const AppShell: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>();
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+  useEffect(() => {
+    dispatch(setAuthLoading(true));
+
+    const unsubscribe = firebaseAuth.onAuthStateChanged(user => {
+      dispatch(setAuthUser(user ? {
+        uid: user.uid,
+        email: user.email ?? '',
+        displayName: user.displayName ?? undefined,
+      } : null));
+    });
+
+    return () => unsubscribe();
+  }, [dispatch]);
+
+  return <AppNavigator />;
+};
+
+const App: React.FC = () => {
+  useEffect(() => {
+    setupNotifications();
+    syncService.startSyncListener();
+
+    return () => {
+      syncService.stopSyncListener();
+    };
+  }, []);
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
+    <Provider store={store}>
+      <ThemeProvider>
+        <AppShell />
+      </ThemeProvider>
+    </Provider>
   );
-}
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
+};
 
 export default App;
